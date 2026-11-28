@@ -3,6 +3,8 @@ import {
   ROLES,
   isOpaqueSessionId,
   type Role,
+  type ActorKind,
+  verifiedActorKind,
   type SessionRecord,
 } from './requireAuth.ts';
 
@@ -24,6 +26,8 @@ export interface CreateSessionInput {
   readonly userId: string;
   readonly tenantId: string;
   readonly role: Role;
+  /** Atestado pelo emissor confiável da sessão, nunca pelo request HTTP. */
+  readonly actorKind?: ActorKind;
   readonly ttlMs?: number;
   /** Epoch em ms. Útil para testes de expiração. Tem prioridade sobre `ttlMs`. */
   readonly expiresAt?: number;
@@ -70,9 +74,14 @@ export class MemorySessionStore implements SessionStore {
       const userId = requiredText(input.userId, 'userId');
       const tenantId = requiredText(input.tenantId, 'tenantId');
       const role = knownRole(input.role);
+      const actorKind = verifiedActorKind(input.actorKind);
+      if (input.actorKind !== undefined && actorKind === undefined) {
+        throw new SessionStoreError('Tipo de ator inválido.');
+      }
       const expiresAt = this.resolveExpiry(input);
       const sessionId = this.newId();
       const record = Object.freeze({
+        ...(actorKind === undefined ? {} : { actorKind }),
         sessionId,
         userId,
         tenantId,

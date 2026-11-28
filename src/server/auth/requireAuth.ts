@@ -10,11 +10,17 @@
 export const ROLES = ['viewer', 'operator', 'admin'] as const;
 
 export type Role = (typeof ROLES)[number];
+export type ActorKind = 'humano' | 'orquestrador' | 'runner';
+
+export function verifiedActorKind(value: unknown): ActorKind | undefined {
+  return value === 'humano' || value === 'orquestrador' || value === 'runner' ? value : undefined;
+}
 
 export interface AuthContext {
   readonly userId: string;
   readonly tenantId: string;
   readonly role: Role;
+  readonly actorKind?: ActorKind;
   readonly sessionId: string;
 }
 
@@ -28,6 +34,7 @@ export interface SessionRecord {
   readonly userId: string;
   readonly tenantId: string;
   readonly role: string;
+  readonly actorKind?: string;
   readonly expiresAt: number;
   readonly revokedAt?: number | null;
 }
@@ -129,7 +136,9 @@ export async function requireAuth(
     throw new AuthError(403, 'tenant_mismatch', 'tenant_id do cliente diverge da sessão.');
   }
 
+  const actorKind = verifiedActorKind(record.actorKind);
   return Object.freeze({
+    ...(actorKind === undefined ? {} : { actorKind }),
     userId,
     tenantId,
     role,

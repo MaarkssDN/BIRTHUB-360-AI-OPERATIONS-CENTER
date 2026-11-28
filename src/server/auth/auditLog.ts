@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { actorKindFromRole, assertIndependentAuditor, type ActorKind } from './actor.ts';
+import { actorKindOf, assertIndependentAuditor, type ActorKind } from './actor.ts';
 import { AuthError, type AuthContext } from './requireAuth.ts';
 
 export class ResourceError extends Error {
@@ -41,7 +41,7 @@ export class MemoryAuditLog {
   private readonly records = new Map<string, AuditSubject>();
 
   create(auth: AuthContext): AuditSubject {
-    const authorKind = actorKindFromRole(auth.role);
+    const authorKind = actorKindOf(auth);
     if ((auth.role !== 'admin' && auth.role !== 'operator') || !authorKind) {
       throw new AuthError(403, 'forbidden', 'Papel insuficiente.');
     }
@@ -72,7 +72,7 @@ export class MemoryAuditLog {
       throw new ResourceError();
     }
     assertIndependentAuditor(auditor.userId, current.authorUserId);
-    const auditorKind = actorKindFromRole(auditor.role);
+    const auditorKind = actorKindOf(auditor);
     if (auditor.role !== 'admin' || auditorKind !== 'humano') {
       throw new AuthError(403, 'forbidden', 'Papel insuficiente.');
     }
