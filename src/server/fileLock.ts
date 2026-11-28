@@ -25,6 +25,8 @@ const heldByPath = new Map<string, HeldLock>();
 export type FileLockOptions = {
   timeoutMs?: number;
   staleMs?: number;
+  /** Operação de manutenção não pode reentrar em conexão ativa neste processo. */
+  exclusive?: boolean;
 };
 
 type LockRecord = {
@@ -61,6 +63,7 @@ export function acquireFileLock(lockPath: string, options: FileLockOptions = {})
   const resolved = path.resolve(lockPath);
   const current = heldByPath.get(resolved);
   if (current) {
+    if (options.exclusive) throw new FileLockError('Banco em uso neste processo.');
     current.depth += 1;
     return releaseOnce(resolved, current);
   }

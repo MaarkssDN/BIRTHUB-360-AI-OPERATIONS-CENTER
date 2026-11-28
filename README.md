@@ -20,7 +20,7 @@ A trava entre processos é o lockfile `<banco>.lock`, criado com `O_EXCL`. `with
 
 ## Schema relacional
 
-As migrations locais criam **47 tabelas de domínio**. `migrations/0001_initial_schema.sql` cria 44. `migrations/0002_imported_conversations_outbox_event_log.sql` cria `ImportedConversations`, `Outbox` e `EventLog`. `schema_migrations` é só o controle do runner e não entra nas 47. Nenhuma tabela tem `tenant_id`. Não há `INSERT` de dados: o seed operacional continua sendo o comando JSON sintético.
+As migrations locais criam **47 tabelas de domínio**. `migrations/0001_initial_schema.sql` cria 44. `migrations/0002_imported_conversations_outbox_event_log.sql` cria `ImportedConversations`, `Outbox` e `EventLog`. `schema_migrations` é só o controle do runner e não entra nas 47. A migration 0003 adiciona `tenant_id` somente em Missions. Não há `INSERT` de dados: o seed operacional continua sendo o comando JSON sintético.
 
 ```bash
 npm run migrate:local
@@ -31,11 +31,11 @@ npm run migrate:local -- data/b360-aoc.sqlite
 
 ## Repositório
 
-`MissionRepository` recebe `AuthContext` em toda chamada, sem default. O tipo mora em `src/auth/context.ts` (`viewer`, `operator`, `admin`). `requireAuth` não está neste repositório. Nenhum método aceita tenant fora do contexto. O adapter JSON grava só se a unidade de trabalho retorna. O adapter SQLite usa `BEGIN IMMEDIATE` e faz rollback se ela lança. `viewer` não grava. `TENANT_ISOLATION` continua `pending`: não há coluna `tenant_id` e o SQL não filtra por inquilino.
+`MissionRepository` recebe `AuthContext` em toda chamada, sem default. O tipo mora em `src/auth/context.ts` (`viewer`, `operator`, `admin`). A camada HTTP tem `requireAuth` em `src/server/auth/requireAuth.ts`; a integração de contexto com os adapters é pendente. Nenhum método aceita tenant fora do contexto. O adapter JSON grava só se a unidade de trabalho retorna. O adapter SQLite usa `BEGIN IMMEDIATE` e faz rollback se ela lança. `viewer` não grava. `TENANT_ISOLATION` é `mission-scoped`: ambos os adapters filtram missões. Registros legados sem tenant ficam inacessíveis; outros domínios não foram homologados.
 
 ## Backup local
 
-`backupSqlite` e `restoreSqlite` copiam um SQLite local. Os dois recusam URL, `d1:`, wrangler, Cloudflare e symlink, sem seguir nem substituir o link. O restore confere `PRAGMA integrity_check` e a contagem e o hash de cada tabela, inclusive `schema_migrations`. A publicação é temporário no mesmo diretório, `fsync`, `rename` e `fsync` do diretório. Um banco com trava viva só é substituído com `overwriteInUse: true`; a conexão já aberta permanece no inode antigo.
+`backupSqlite` e `restoreSqlite` copiam um SQLite local. Os dois recusam URL, `d1:`, wrangler, Cloudflare e symlink, sem seguir nem substituir o link. O restore confere `PRAGMA integrity_check` e a contagem e o hash de cada tabela, inclusive `schema_migrations`. A publicação é temporário no mesmo diretório, `fsync`, `rename` e `fsync` do diretório. Restore em banco ativo é proibido, inclusive com `overwriteInUse`.
 
 ## Verificar
 
@@ -45,7 +45,11 @@ npm run typecheck
 npm test
 npm run test:coverage
 npm run build
-npm start
+npm start # exige banco de segurança previamente provisionado
 ```
 
 `data/`, `.env` e `*.db` ficam fora do Git. Variáveis de exemplo, só com placeholders, estão em `.env.example`.
+
+## Segurança e preflight
+
+Health e ready são públicos; demais rotas API exigem sessão. Produção exige `B360_AOC_SECURITY_DB_PATH` explícito; consulte `docs/p0-durable-security.md`. Preflight e leases são candidatos parciais; não há executor real homologado. Sem merge/deploy autorizado.

@@ -1,0 +1,3 @@
+# Onda 11 — candidato parcial
+
+Lease SQLite persistente com TTL, colisão transacional e renovação; expiração não libera recursos automaticamente. Verificador local coleta Git, paths reais, symlinks/junctions, porta, recursos, allowlist e lease. A identidade de runner deve vir de bootstrap autenticado, não de request. O módulo não está ligado a um executor; verificar novamente antes de cada operação, reservar porta durante uso, implementar fencing/release e enforcement de allowlist no executor. Não certifica isolamento de rede, Redis, cloud ou processos externos. Sem atestado, bloqueado. CI e revisão independente necessários.
