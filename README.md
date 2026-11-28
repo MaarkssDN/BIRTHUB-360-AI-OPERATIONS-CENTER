@@ -18,6 +18,17 @@ A trava entre processos é o lockfile `<banco>.lock`, criado com `O_EXCL`. `with
 
 `npm run db:seed` grava a fixture sintética `test/fixtures/b360-aoc-db.synthetic.json`.
 
+## Schema relacional
+
+As migrations locais criam **47 tabelas de domínio**. `migrations/0001_initial_schema.sql` cria 44. `migrations/0002_imported_conversations_outbox_event_log.sql` cria `ImportedConversations`, `Outbox` e `EventLog`. `schema_migrations` é só o controle do runner e não entra nas 47. Nenhuma tabela tem `tenant_id`. Não há `INSERT` de dados: o seed operacional continua sendo o comando JSON sintético.
+
+```bash
+npm run migrate:local
+npm run migrate:local -- data/b360-aoc.sqlite
+```
+
+`npm run migrate:local` é idempotente, grava o SHA-256 de cada arquivo e pode rodar de novo sem reaplicar. Recusa URL, `d1:`, wrangler e Cloudflare. Não aplica migration remota. A reconstrução da `0001` está em `docs/schema-relacional.md`.
+
 ## Verificar
 
 ```bash
