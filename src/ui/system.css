@@ -199,6 +199,11 @@ p {
   padding-block: var(--b360-space-6) var(--b360-space-8);
 }
 
+.b360-page a {
+  color: var(--b360-ink);
+  text-underline-offset: 0.18em;
+}
+
 .b360-lede {
   max-width: var(--b360-measure);
   margin: 0 0 var(--b360-space-5);
