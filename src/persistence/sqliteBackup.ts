@@ -2,15 +2,15 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { assertLocalSqliteTarget, openLocalSqlite } from '../db/migrate.ts';
-import { describeFileLock } from '../server/fileLock.ts';
+import { acquireFileLock, FileLockError } from '../server/fileLock.ts';
 
 /**
  * Backup e restore locais de um arquivo SQLite.
  *
  * O restore publica um snapshot com temporário no mesmo diretório, `fsync`,
  * `rename` e `fsync` do diretório. Antes do `rename` confere `PRAGMA integrity_check`
- * e o hash de cada tabela. Um destino com trava viva só é substituído quando
- * `overwriteInUse` é true. A conexão que já estava aberta permanece no inode antigo.
+ * e o hash de cada tabela. Operações exigem lock exclusivo nos dois arquivos.
+ * Restore com conexão ativa é sempre recusado, sem opção de bypass.
  * URL, D1, wrangler, Cloudflare e symlink são recusados.
  */
 
@@ -57,9 +57,11 @@ export function backupSqlite(sourcePath: string, backupPath: string): SqliteInte
   if (inspectFile(destination, 'O destino do backup')) {
     throw new SqliteBackupError('O destino do backup já existe. Nada foi substituído.');
   }
-  const report = readIntegrity(source);
-  publishSnapshot(source, destination, false, report);
-  return report;
+  return withMaintenanceLocks(source, destination, () => {
+    const report = readIntegrity(source);
+    publishSnapshot(source, destination, false, report);
+    return report;
+  });
 }
 
 export function restoreSqlite(
@@ -74,15 +76,23 @@ export function restoreSqlite(
     throw new SqliteBackupError('Arquivo de backup não existe. Nada foi restaurado.');
   }
   assertParent(path.dirname(target));
-  const targetExists = inspectFile(target, 'O destino do restore') !== null;
-  if (targetExists && databaseInUse(target) && options.overwriteInUse !== true) {
-    throw new SqliteBackupError(
-      'O banco de destino está em uso. Restore recusado sem overwriteInUse.',
-    );
+  if (options.overwriteInUse === true) {
+    throw new SqliteBackupError('Restore em banco em uso é proibido; opção de bypass recusada.');
   }
-  const report = readIntegrity(backup);
-  publishSnapshot(backup, target, true, report);
-  return report;
+  return withMaintenanceLocks(backup, target, () => {
+    const targetExists = inspectFile(target, 'O destino do restore') !== null;
+    if (targetExists && databaseInUse(target)) {
+      throw new SqliteBackupError('O banco de destino está em uso.');
+    }
+    for (const suffix of ['-wal', '-shm', '-journal']) {
+      if (inspectFile(target + suffix, 'Arquivo auxiliar SQLite')) {
+        throw new SqliteBackupError('Arquivo auxiliar SQLite presente; restore offline necessário.');
+      }
+    }
+    const report = readIntegrity(backup);
+    publishSnapshot(backup, target, true, report);
+    return report;
+  });
 }
 
 function publishSnapshot(
@@ -131,16 +141,24 @@ function publishSnapshot(
   }
 }
 
+function withMaintenanceLocks<T>(source: string, target: string, run: () => T): T {
+  const releases: Array<() => void> = [];
+  try {
+    for (const filename of [source, target].sort()) {
+      try {
+        releases.push(acquireFileLock(filename + '.lock', { exclusive: true, timeoutMs: 100 }));
+      } catch (error) {
+        if (error instanceof FileLockError) throw new SqliteBackupError('Banco em uso ou trava inválida.');
+        throw error;
+      }
+    }
+    return run();
+  } finally {
+    for (const release of releases.reverse()) release();
+  }
+}
+
 function databaseInUse(filename: string): boolean {
-  const lockState = describeFileLock(`${filename}.lock`);
-  if (lockState === 'symlink') {
-    throw new SqliteBackupError(
-      'O lock do banco é um symlink. Recusado sem seguir nem substituir.',
-    );
-  }
-  if (lockState === 'live') {
-    return true;
-  }
   let db: ReturnType<typeof openLocalSqlite> | undefined;
   try {
     db = openLocalSqlite(filename);
