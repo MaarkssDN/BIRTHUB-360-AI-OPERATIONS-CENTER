@@ -60,8 +60,9 @@ export function loadDatabase(): DatabaseState {
     raw = fs.readFileSync(filePath, 'utf8');
   } catch (error) {
     const detail = error instanceof Error ? error.message : 'leitura falhou';
+    console.error(`[B360-AOC] falha ao ler o banco: ${detail}`);
     throw new DatabaseUnavailableError(
-      `Falha ao ler o banco (${detail}). Carga fail-closed: nada foi semeado.`,
+      'Falha ao ler o banco. Carga fail-closed: nada foi semeado.',
     );
   }
   return parseDatabaseState(raw);
@@ -87,11 +88,29 @@ export function saveDatabase(state: DatabaseState): void {
     parent,
     `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`,
   );
-  fs.writeFileSync(temporary, payload, 'utf8');
+  let descriptor: number | undefined;
+  try {
+    descriptor = fs.openSync(temporary, 'w');
+    fs.writeFileSync(descriptor, payload);
+    fs.fsyncSync(descriptor);
+  } catch (error) {
+    if (descriptor !== undefined) {
+      fs.closeSync(descriptor);
+    }
+    fs.rmSync(temporary, { force: true });
+    throw error;
+  }
+  fs.closeSync(descriptor);
   try {
     fs.renameSync(temporary, filePath);
   } catch (error) {
     fs.rmSync(temporary, { force: true });
     throw error;
+  }
+  const directory = fs.openSync(parent, 'r');
+  try {
+    fs.fsyncSync(directory);
+  } finally {
+    fs.closeSync(directory);
   }
 }

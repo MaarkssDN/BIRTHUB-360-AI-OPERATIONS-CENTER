@@ -1,4 +1,5 @@
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
+import type { ViteDevServer } from 'vite';
 import path from 'node:path';
 import {
   HealthResponseSchema,
@@ -10,6 +11,10 @@ import { loadDatabase } from './db.ts';
 export type CreateAppOptions = {
   vite?: boolean;
   clientDir?: string;
+};
+
+export type RunningApp = Express & {
+  closeEmbeddedServers: () => Promise<void>;
 };
 
 function httpStatus(error: unknown): number {
@@ -53,8 +58,9 @@ function sendReady(res: Response): void {
   }
 }
 
-export async function createApp(options: CreateAppOptions = {}): Promise<Express> {
+export async function createApp(options: CreateAppOptions = {}): Promise<RunningApp> {
   const app = express();
+  let embedded: ViteDevServer | undefined;
   app.disable('x-powered-by');
   app.use(express.json({ limit: '32kb' }));
 
@@ -74,11 +80,15 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Express
 
   if (options.vite === true) {
     const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
+    embedded = await createViteServer({
+      server: {
+        host: '127.0.0.1',
+        middlewareMode: true,
+        ws: { host: '127.0.0.1' },
+      },
       appType: 'spa',
     });
-    app.use(vite.middlewares);
+    app.use(embedded.middlewares);
   } else if (options.clientDir !== undefined) {
     attachClient(app, options.clientDir);
   } else if (process.env.NODE_ENV === 'production') {
@@ -93,5 +103,9 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Express
     res.status(httpStatus(error)).json({ status: 'error' });
   });
 
-  return app;
+  return Object.assign(app, {
+    closeEmbeddedServers: async () => {
+      await embedded?.close();
+    },
+  });
 }
