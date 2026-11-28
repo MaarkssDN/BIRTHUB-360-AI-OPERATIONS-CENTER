@@ -74,7 +74,7 @@ test('applyMigrations materializa 47 tabelas, a unicidade da Outbox e o EventLog
       listUserTables(db).sort(),
       [...RELATIONAL_TABLES, SCHEMA_MIGRATIONS_TABLE].sort(),
     );
-    assert.equal(countOf(db, SCHEMA_MIGRATIONS_TABLE), 2);
+    assert.equal(countOf(db, SCHEMA_MIGRATIONS_TABLE), 3);
 
     for (const table of RELATIONAL_TABLES) {
       assert.equal(columnNames(db, table).includes('tenant_id'), false, table);
@@ -188,7 +188,7 @@ test('um arquivo SQLite temporário aceita duas execuções do runner', () => {
     assert.deepEqual(second.applied, []);
     assert.equal(second.skipped.length, 3);
     assert.deepEqual([...second.domainTables].sort(), [...first.domainTables].sort());
-    assert.equal(countOf(secondDb, SCHEMA_MIGRATIONS_TABLE), 2);
+    assert.equal(countOf(secondDb, SCHEMA_MIGRATIONS_TABLE), 3);
     secondDb.close();
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
