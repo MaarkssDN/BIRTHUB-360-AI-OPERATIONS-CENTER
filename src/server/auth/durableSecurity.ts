@@ -36,6 +36,7 @@ export function provisionSecurityDatabase(db: DatabaseSync): void {
 export class SqliteSessionStore implements SessionStore {
   constructor(private readonly db: DatabaseSync, private readonly now = Date.now) {}
   async create(input: CreateSessionInput): Promise<SessionRecord> {
+    await Promise.resolve();
     const userId = input.userId?.trim(), tenantId = input.tenantId?.trim();
     const actorKind = verifiedActorKind(input.actorKind);
     const now = this.now();
@@ -50,6 +51,7 @@ export class SqliteSessionStore implements SessionStore {
     return { sessionId, userId, tenantId, role: input.role, actorKind, expiresAt, revokedAt: null };
   }
   async get(sessionId: string): Promise<SessionRecord | null> {
+    await Promise.resolve();
     if (!isOpaqueSessionId(sessionId)) return null;
     const row = this.db.prepare('SELECT * FROM aoc_sessions WHERE token_hash = ?').get(hash(sessionId));
     if (!row || typeof row.user_id !== 'string' || typeof row.tenant_id !== 'string' ||
