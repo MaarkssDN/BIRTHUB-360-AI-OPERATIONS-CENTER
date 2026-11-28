@@ -1,0 +1,19 @@
+{
+  "origin": "synthetic",
+  "documents": [
+    {
+      "source_id": "SYN-SRC-001",
+      "revision": "rev-1",
+      "relative_path": "synthetic/conversa-alfa.txt",
+      "media_type": "text/plain",
+      "body": "Registro sintético alfa.\nSem histórico real e sem identificador externo.\n"
+    },
+    {
+      "source_id": "SYN-SRC-002",
+      "revision": "rev-1",
+      "relative_path": "synthetic/conversa-beta.md",
+      "media_type": "text/markdown",
+      "body": "# Registro sintético beta\n\nTexto fictício para o dry-run da onda 09.\n"
+    }
+  ]
+}
