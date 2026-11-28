@@ -29,7 +29,10 @@ export const DatabaseStateSchema = z
           executorAgentId: z.string().min(1),
           auditorAgentId: z.string().min(1),
         })
-        .strict(),
+        .strict()
+        .refine((mission) => mission.executorAgentId.trim() !== mission.auditorAgentId.trim(), {
+          message: 'executor e auditor devem ser distintos',
+        }),
     ),
   })
   .strict();
