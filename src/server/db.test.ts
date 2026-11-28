@@ -386,6 +386,31 @@ test('processos concorrentes não perdem atualização sob a trava', { timeout: 
   assert.equal(names.some((name) => name.includes('.tmp') || name.endsWith('.lock')), false);
 });
 
+test('gate órfão bloqueia a aquisição sem remover evidência', () => {
+  const gate = `${sandbox.dbPath()}.lock.gate`;
+  fsSync.mkdirSync(gate);
+  try {
+    assert.throws(() => withDatabaseLock(() => loadDatabase(), { timeoutMs: 80 }), /trava/);
+    assert.equal(fsSync.existsSync(gate), true);
+  } finally {
+    fsSync.rmdirSync(gate);
+  }
+});
+
+test('recuperação concorrente de lock stale mantém todas as atualizações', { timeout: 20_000 }, async () => {
+  const filePath = sandbox.dbPath();
+  fsSync.writeFileSync(`${filePath}.lock`, JSON.stringify({
+    pid: deadPid(), nonce: 'stale-concorrente', starttime: null,
+    acquiredAt: '2000-01-01T00:00:00.000Z',
+  }));
+  const markers = ['s0', 's1', 's2', 's3'];
+  const results = await Promise.all(markers.map((marker) => runLockWorker(filePath, marker, 8)));
+  for (const result of results) assert.equal(result.status, 0, result.stderr);
+  const parts = (loadDatabase().missions[0]?.title ?? '').split('|').slice(1);
+  for (const marker of markers) assert.equal(parts.filter((part) => part === marker).length, 8);
+  assert.equal(fsSync.existsSync(`${filePath}.lock.gate`), false);
+});
+
 function loadSafeFixture(): ReturnType<typeof parseDatabaseState> {
   return parseDatabaseState(fsSync.readFileSync(FIXTURE, 'utf8'));
 }

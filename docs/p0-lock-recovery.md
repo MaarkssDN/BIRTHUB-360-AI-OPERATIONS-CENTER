@@ -1,0 +1,3 @@
+# P0 — Recuperação de trava local
+
+Candidato isolado, não homologado. A aquisição e a recuperação stale compartilham um gate exclusivo por mkdir. Ausência não é stale. Gate abandonado não é roubado: falha fechada. Em incidente, parar todos os escritores, verificar PIDs, paths e backup, preservar evidências e somente então autorizar remoção manual do gate. Não usar com escritores de versões antigas, workers no mesmo processo, NFS ou outros hosts. Testes de concorrência existentes mantidos e adicionados casos de gate órfão e stale concorrente. CI e revisão independente necessários; não autoriza merge.
