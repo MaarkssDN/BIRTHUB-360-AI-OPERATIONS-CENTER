@@ -112,4 +112,4 @@ jobs:
           VERSION=8.30.1
           curl -fsSL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
           tar -xzf gitleaks.tar.gz gitleaks
-          ./gitleaks detect --source . --redact --verbose --exit-code 1
+          ./gitleaks detect --source . --log-opts="HEAD" --redact --verbose --exit-code 1
