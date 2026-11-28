@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseStateSchema, type DatabaseState } from '../shared/contracts.ts';
@@ -83,14 +82,20 @@ export function loadDatabase(): DatabaseState {
         'Arquivo do banco não existe. Carga fail-closed: nada foi semeado.',
       );
     }
+    if (described.kind === 'other') {
+      console.error('[B360-AOC] falha ao ler o banco: o caminho não é um arquivo regular');
+      throw new DatabaseUnavailableError(
+        'Falha ao ler o banco. Carga fail-closed: nada foi semeado.',
+      );
+    }
     return parseDatabaseState(readRegularFile(filePath));
   });
 }
 
 /**
  * Grava no caminho resolvido nesta chamada. Não cria o diretório pai.
- * O temporário recebe `fsync` antes do `rename`, e o diretório recebe `fsync`
- * depois. Falha de `rename` aborta: não há cópia por cima do destino.
+ * O `fsync` do temporário e o do diretório são os do scaffold: um de cada,
+ * em volta do `rename`. Falha de `rename` aborta, sem cópia por cima do destino.
  * O modo de um arquivo regular existente é preservado. Arquivo novo fica em 0600.
  * Symlink não é seguido nem substituído.
  */
@@ -106,6 +111,9 @@ export function saveDatabase(state: DatabaseState): void {
     const filePath = resolveDbFilePath();
     assertParentDirectory(path.dirname(filePath), 'save');
     const described = describeTarget(filePath);
+    if (described.kind === 'other') {
+      throw new DatabaseUnavailableError('O caminho do banco não é um arquivo regular.');
+    }
     const mode = described.kind === 'file' ? described.mode : 0o600;
     writeAtomicFile(filePath, payload, mode);
   });
@@ -141,7 +149,9 @@ function assertParentDirectory(parent: string, purpose: 'load' | 'save'): void {
   }
 }
 
-function describeTarget(filePath: string): { kind: 'absent' } | { kind: 'file'; mode: number } {
+function describeTarget(
+  filePath: string,
+): { kind: 'absent' } | { kind: 'file'; mode: number } | { kind: 'other' } {
   try {
     const stat = fs.lstatSync(filePath);
     if (stat.isSymbolicLink()) {
@@ -150,7 +160,7 @@ function describeTarget(filePath: string): { kind: 'absent' } | { kind: 'file'; 
       );
     }
     if (!stat.isFile()) {
-      throw new DatabaseUnavailableError('O caminho do banco não é um arquivo regular.');
+      return { kind: 'other' };
     }
     return { kind: 'file', mode: stat.mode & 0o777 };
   } catch (error) {
@@ -175,58 +185,60 @@ function readRegularFile(filePath: string): string {
         'O caminho do banco é um symlink. Recusado sem seguir nem substituir.',
       );
     }
-    const detail = error instanceof Error ? error.message : 'leitura falhou';
+    logReadFailure(error);
     throw new DatabaseUnavailableError(
-      `Falha ao ler o banco (${detail}). Carga fail-closed: nada foi semeado.`,
+      'Falha ao ler o banco. Carga fail-closed: nada foi semeado.',
     );
   }
   try {
     return fs.readFileSync(fd, 'utf8');
   } catch (error) {
-    const detail = error instanceof Error ? error.message : 'leitura falhou';
+    logReadFailure(error);
     throw new DatabaseUnavailableError(
-      `Falha ao ler o banco (${detail}). Carga fail-closed: nada foi semeado.`,
+      'Falha ao ler o banco. Carga fail-closed: nada foi semeado.',
     );
   } finally {
     fs.closeSync(fd);
   }
 }
 
+function logReadFailure(error: unknown): void {
+  const detail = error instanceof Error ? error.message : 'leitura falhou';
+  console.error(`[B360-AOC] falha ao ler o banco: ${detail}`);
+}
+
 function writeAtomicFile(filePath: string, payload: string, mode: number): void {
   const parent = path.dirname(filePath);
   const temporary = path.join(
     parent,
-    `.${path.basename(filePath)}.${String(process.pid)}.${Date.now().toString(36)}.${crypto.randomBytes(4).toString('hex')}.tmp`,
+    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`,
   );
-  let fd: number | undefined;
-  let renamed = false;
+  let descriptor: number | undefined;
   try {
-    fd = fs.openSync(
-      temporary,
-      fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL,
-      0o600,
-    );
-    fs.writeSync(fd, payload);
-    fs.fchmodSync(fd, mode);
-    fs.fsyncSync(fd);
-    fs.closeSync(fd);
-    fd = undefined;
+    descriptor = fs.openSync(temporary, 'w');
+    fs.writeFileSync(descriptor, payload);
+    fs.fchmodSync(descriptor, mode);
+    fs.fsyncSync(descriptor);
+  } catch (error) {
+    if (descriptor !== undefined) {
+      fs.closeSync(descriptor);
+    }
+    fs.rmSync(temporary, { force: true });
+    throw error;
+  }
+  fs.closeSync(descriptor);
+  try {
     refuseSymlinkReplacement(filePath);
     fs.renameSync(temporary, filePath);
-    renamed = true;
-    fsyncDirectory(parent);
   } catch (error) {
-    if (fd !== undefined) {
-      try {
-        fs.closeSync(fd);
-      } catch {
-        // o fd pode já ter sido fechado
-      }
-    }
-    if (!renamed) {
-      fs.rmSync(temporary, { force: true });
-    }
+    fs.rmSync(temporary, { force: true });
     throw error;
+  }
+  const directory = fs.openSync(parent, 'r');
+  try {
+    fs.fsyncSync(directory);
+  } finally {
+    fs.closeSync(directory);
   }
 }
 
@@ -246,18 +258,6 @@ function refuseSymlinkReplacement(filePath: string): void {
       return;
     }
     throw error;
-  }
-}
-
-function fsyncDirectory(directory: string): void {
-  const fd = fs.openSync(
-    directory,
-    fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW,
-  );
-  try {
-    fs.fsyncSync(fd);
-  } finally {
-    fs.closeSync(fd);
   }
 }
 
