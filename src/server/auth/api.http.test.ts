@@ -1,4 +1,9 @@
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { SqliteKillSwitch } from './killSwitch.ts';
 import type { Server } from 'node:http';
 import { once } from 'node:events';
 import { test } from 'node:test';
@@ -83,7 +88,7 @@ async function sessionFor(
   userId = `user-${role}`,
   tenantId = 'tenant-a',
 ): Promise<SessionRecord> {
-  return security.sessions.create({ userId, tenantId, role });
+  return security.sessions.create({ userId, tenantId, role, actorKind: role === 'admin' ? 'humano' : 'orquestrador' });
 }
 
 for (const rule of PROTECTED) {
@@ -454,4 +459,47 @@ test('caminho /api desconhecido sem sessão é 401 e com sessão é 404', async 
     const known = await send(base, 'GET', '/api/nao-existe', session.sessionId);
     assert.equal(known.status, 404);
   });
+});
+
+test('admin de serviço não se torna humano por role nem por body', async () => {
+  await withApp(async (base, security) => {
+    const service = await security.sessions.create({
+      userId: 'service-synthetic', tenantId: 'tenant-a', role: 'admin', actorKind: 'runner',
+    });
+    const response = await send(base, 'POST', '/api/kill-switch', service.sessionId, {
+      body: { enabled: false, actorKind: 'humano' },
+    });
+    assert.equal(response.status, 403);
+    const legacy = await security.sessions.create({
+      userId: 'legacy-synthetic', tenantId: 'tenant-a', role: 'admin',
+    });
+    assert.equal((await send(base, 'POST', '/api/kill-switch', legacy.sessionId, {
+      body: { enabled: false },
+    })).status, 403);
+  });
+});
+
+test('suspensão SQLite persiste após reabertura e falha fechada sem esquema', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aoc-stop-'));
+  const filename = path.join(dir, 'security.sqlite');
+  const human = { userId: 'human-synthetic', tenantId: 'tenant-a', role: 'admin' as const,
+    sessionId: 'synthetic-session', actorKind: 'humano' as const };
+  let db = new DatabaseSync(filename);
+  try {
+    assert.equal(new SqliteKillSwitch(db).isEnabled(), true);
+    assert.throws(() => new SqliteKillSwitch(db).setEnabled(false, human));
+    SqliteKillSwitch.provision(db);
+    const stop = new SqliteKillSwitch(db);
+    assert.equal(stop.isEnabled(), true);
+    assert.equal(stop.setEnabled(false, human).enabled, false);
+    assert.equal(stop.setEnabled(true, human).enabled, true);
+    db.close();
+    db = new DatabaseSync(filename);
+    assert.equal(new SqliteKillSwitch(db).isEnabled(), true);
+    assert.throws(() => new SqliteKillSwitch(db).setEnabled(false, { ...human, actorKind: 'runner' }));
+    assert.equal(new SqliteKillSwitch(db).isEnabled(), true);
+  } finally {
+    db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

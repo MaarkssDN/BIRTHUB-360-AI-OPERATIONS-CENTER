@@ -1,14 +1,6 @@
 import { evaluateAuditorIndependence } from '../../domain/independence.ts';
-import { AuthError, type AuthContext, type Role } from './requireAuth.ts';
-
-/** Tipo de autor derivado do papel da sessão. Nunca vem do body. */
-export type ActorKind = 'humano' | 'orquestrador';
-
-export function actorKindFromRole(role: Role): ActorKind | null {
-  if (role === 'admin') return 'humano';
-  if (role === 'operator') return 'orquestrador';
-  return null;
-}
+import { AuthError, verifiedActorKind, type AuthContext, type ActorKind } from './requireAuth.ts';
+export type { ActorKind } from './requireAuth.ts';
 
 /**
  * O auditor é o `userId` do `AuthContext`. O autor é o gravado no servidor
@@ -29,5 +21,5 @@ export function assertIndependentAuditor(auditorUserId: string, authorUserId: st
 }
 
 export function actorKindOf(auth: AuthContext): ActorKind | null {
-  return actorKindFromRole(auth.role);
+  return verifiedActorKind(auth.actorKind) ?? null;
 }
