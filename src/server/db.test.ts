@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -70,7 +71,34 @@ test('loadDatabase falha fechado se o caminho é um diretório', async () => {
   const filePath = sandbox.dbPath();
   await fs.rm(filePath);
   await fs.mkdir(filePath);
-  assert.throws(() => loadDatabase(), /Falha ao ler o banco/);
+  assert.throws(
+    () => loadDatabase(),
+    (error: unknown) => {
+      assert.ok(error instanceof DatabaseUnavailableError);
+      assert.match(error.message, /Falha ao ler o banco/);
+      assert.equal(error.message.includes(filePath), false);
+      return true;
+    },
+  );
+});
+
+test('saveDatabase faz fsync do arquivo e do diretório e não deixa temporário', () => {
+  const original = fsSync.fsyncSync;
+  let calls = 0;
+  fsSync.fsyncSync = (fd: number) => {
+    calls += 1;
+    return original.call(fsSync, fd);
+  };
+  try {
+    saveDatabase(loadDatabase());
+    assert.ok(calls >= 2);
+    const leftovers = fsSync
+      .readdirSync(sandbox.dir())
+      .filter((name) => name.includes('.tmp'));
+    assert.deepEqual(leftovers, []);
+  } finally {
+    fsSync.fsyncSync = original;
+  }
 });
 
 test('loadDatabase falha fechado se o arquivo não existe e não semeia', async () => {
@@ -102,6 +130,18 @@ test('saveDatabase não cria o diretório pai', async () => {
   await assert.rejects(fs.access(path.dirname(missing)));
 });
 
+test('o contrato recusa executor igual ao auditor', () => {
+  const state = loadDatabase();
+  const mission = state.missions[0];
+  assert.ok(mission);
+  const raw = JSON.stringify({
+    ...state,
+    missions: [{ ...mission, auditorAgentId: ` ${mission.executorAgentId} ` }],
+  });
+  assert.throws(() => parseDatabaseState(raw), /rejeitado pelo contrato/);
+  assert.equal(fsSync.readFileSync(sandbox.dbPath(), 'utf8').includes(mission.auditorAgentId), true);
+});
+
 test('o contrato recusa ponte habilitada', () => {
   const state = loadDatabase();
   const raw = JSON.stringify({
@@ -120,6 +160,23 @@ test('o seed explícito grava a fixture sintética', () => {
   const state = loadDatabase();
   assert.equal(state.seed, 'synthetic');
   assert.equal(state.providers[0]?.id, 'IA-SYNTHETIC');
+});
+
+test('o seed recusa sobrescrever e o overwrite explícito guarda backup', async () => {
+  const filePath = sandbox.dbPath();
+  const original = await fs.readFile(filePath, 'utf8');
+  assert.throws(() => seedDatabaseFromFixture(), /já existe/);
+  assert.equal(await fs.readFile(filePath, 'utf8'), original);
+
+  const state = loadDatabase();
+  saveDatabase({
+    ...state,
+    governance: { ...state.governance, globalAutomationSuspended: false },
+  });
+  const changed = await fs.readFile(filePath, 'utf8');
+  seedDatabaseFromFixture(FIXTURE, { overwrite: true });
+  assert.equal(loadDatabase().governance.globalAutomationSuspended, true);
+  assert.equal(await fs.readFile(`${filePath}.bak`, 'utf8'), changed);
 });
 
 test('a fixture não contém e-mail, Drive nem segredo', async () => {
