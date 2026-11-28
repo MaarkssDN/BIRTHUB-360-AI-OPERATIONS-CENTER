@@ -52,7 +52,7 @@ test('backup e restore locais fazem round-trip com integridade por tabela', () =
   }
 });
 
-test('restore recusa banco em uso sem flag e substitui com a flag', () => {
+test('restore recusa banco em uso inclusive com flag legada', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'b360-aoc-backup-use-'));
   const target = path.join(dir, 'live.sqlite');
   const backup = path.join(dir, 'backup.sqlite');
@@ -72,10 +72,13 @@ test('restore recusa banco em uso sem flag e substitui com a flag', () => {
       assert.throws(() => restoreSqlite(backup, target), /em uso/);
       assert.deepEqual(fs.readFileSync(target), before);
       assert.equal(outboxStatus(target), 'DESPACHADO');
-      restoreSqlite(backup, target, { overwriteInUse: true });
+      assert.throws(() => restoreSqlite(backup, target, { overwriteInUse: true }), /em uso/);
+      assert.deepEqual(fs.readFileSync(target), before);
     } finally {
       repo.close();
     }
+    assert.equal(outboxStatus(target), 'DESPACHADO');
+    restoreSqlite(backup, target);
     assert.equal(measureSqliteIntegrity(target).digestSha256, report.digestSha256);
     assert.equal(outboxStatus(target), 'PENDENTE');
     assert.deepEqual(leftoverTemps(dir), []);
