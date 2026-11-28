@@ -4,6 +4,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { actorKindOf, assertIndependentAuditor } from './actor.ts';
 import { ResourceError, ConflictError, type AuditSubject } from './auditLog.ts';
+import { provisionPrincipalRegistry } from './principalIssuer.ts';
 import { SqliteKillSwitch } from './killSwitch.ts';
 import { AuthError, ROLES, isOpaqueSessionId, verifiedActorKind, type AuthContext, type SessionRecord } from './requireAuth.ts';
 import { DEFAULT_SESSION_TTL_MS, SessionStoreError, type CreateSessionInput, type SessionStore } from './sessionStore.ts';
@@ -32,6 +33,7 @@ export function provisionSecurityDatabase(db: DatabaseSync): void {
       (approved = 1 AND auditor_user_id IS NOT NULL AND auditor_kind = 'humano'))
   );`);
   SqliteKillSwitch.provision(db);
+  provisionPrincipalRegistry(db);
 }
 export class SqliteSessionStore implements SessionStore {
   constructor(private readonly db: DatabaseSync, private readonly now = Date.now) {}

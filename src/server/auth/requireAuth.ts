@@ -16,6 +16,14 @@ export function verifiedActorKind(value: unknown): ActorKind | undefined {
   return value === 'humano' || value === 'orquestrador' || value === 'runner' ? value : undefined;
 }
 
+const authenticatedContexts = new WeakSet<object>();
+
+export function assertAuthenticatedContext(value: unknown): asserts value is AuthContext {
+  if (typeof value !== 'object' || value === null || !authenticatedContexts.has(value)) {
+    throw new AuthError(401, 'unauthenticated', 'Contexto não emitido pela autenticação.');
+  }
+}
+
 export interface AuthContext {
   readonly userId: string;
   readonly tenantId: string;
@@ -137,13 +145,15 @@ export async function requireAuth(
   }
 
   const actorKind = verifiedActorKind(record.actorKind);
-  return Object.freeze({
+  const context = Object.freeze({
     ...(actorKind === undefined ? {} : { actorKind }),
     userId,
     tenantId,
     role,
     sessionId: record.sessionId,
   });
+  authenticatedContexts.add(context);
+  return context;
 }
 
 type ClientTenantClaim =

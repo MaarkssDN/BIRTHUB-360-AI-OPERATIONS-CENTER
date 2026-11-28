@@ -4,14 +4,8 @@
  * Nenhum repositório lê tenant a partir de um request.
  */
 
-export type Role = 'viewer' | 'operator' | 'admin';
-
-export interface AuthContext {
-  readonly userId: string;
-  readonly tenantId: string;
-  readonly role: Role;
-  readonly sessionId: string;
-}
+import { assertAuthenticatedContext, type AuthContext, type Role } from '../server/auth/requireAuth.ts';
+export type { AuthContext, Role } from '../server/auth/requireAuth.ts';
 
 export class AuthContextError extends Error {
   constructor(message: string) {
@@ -25,6 +19,11 @@ const ROLES: readonly Role[] = ['viewer', 'operator', 'admin'];
 export function parseAuthContext(value: unknown): AuthContext {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new AuthContextError('AuthContext ausente. A chamada foi recusada.');
+  }
+  // Development fixtures may use synthetic structural contexts. Production never does.
+  if (process.env.NODE_ENV === 'production') {
+    assertAuthenticatedContext(value);
+    return value;
   }
   const record = value as Record<string, unknown>;
   const role = record.role;

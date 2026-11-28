@@ -1,0 +1,3 @@
+# Candidato: fronteiras integradas
+
+Identidade emitida por credencial aleatória previamente provisionada fora da API, hash em SQLite; sem login público, verificação humana externa ou revogação em cascata. Contexto autenticado marcado no processo; adapters exigem essa marca em produção. Catálogo de 47 domínios usa DBs dedicados, registrados explicitamente por código confiável, marca tenant no banco e recusa compartilhamento; somente contagens de leitura, não entrega CRUD nem migração de legado. Executor concreto executa exclusivamente leitura de HEAD após preflight, identidade e kill switch; sem execução arbitrária ou missão real. Ainda faltam isolamento de SO, provisionamento operacional, fencing e teste positivo em ambiente real. Não autoriza release.
