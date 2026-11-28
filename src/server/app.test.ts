@@ -144,7 +144,8 @@ test('o client estático não mascara /api e devolve o index', async () => {
     assert.equal(health.status, 200);
     assert.equal(health.headers.get('x-powered-by'), null);
     const missingApi = await fetch(`${baseUrl}/api/nao-existe`);
-    assert.equal(missingApi.status, 404);
+    assert.equal(missingApi.status, 401);
+    assert.equal((await missingApi.text()).includes('scaffold'), false);
   }, { clientDir });
 });
 

@@ -30,3 +30,7 @@ npm start
 ```
 
 `data/`, `.env` e `*.db` ficam fora do Git. Variáveis de exemplo, só com placeholders, estão em `.env.example`.
+
+## API
+
+`GET /api/health` e `GET /api/ready` são públicas e não devolvem caminho de arquivo. O restante de `/api` exige sessão opaca (Bearer ou cookie `HttpOnly`) e um papel. O contrato, a matriz rota×papel e a interface `SessionStore` estão em `src/server/auth/README.md`. O bind e o HMR continuam em `127.0.0.1`.
