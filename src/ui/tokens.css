@@ -1,0 +1,125 @@
+/* light */
+:root {
+  color-scheme: light;
+  --b360-canvas: oklch(0.955 0.018 125);
+  --b360-panel: oklch(0.985 0.01 120);
+  --b360-elevated: oklch(0.925 0.02 125);
+  --b360-ink: oklch(0.28 0.035 150);
+  --b360-ink-secondary: oklch(0.38 0.03 150);
+  --b360-ink-muted: oklch(0.4 0.028 150);
+  --b360-border-strong: oklch(0.48 0.03 145);
+  --b360-header: oklch(0.36 0.055 150);
+  --b360-header-ink: oklch(0.97 0.012 120);
+  --b360-accent: oklch(0.4 0.085 152);
+  --b360-accent-hover: oklch(0.46 0.09 152);
+  --b360-accent-ink: oklch(0.98 0.008 120);
+  --b360-danger: oklch(0.42 0.12 28);
+  --b360-danger-hover: oklch(0.48 0.12 28);
+  --b360-danger-ink: oklch(0.98 0.008 120);
+  --b360-focus: oklch(0.42 0.11 255);
+  --b360-demo-fg: oklch(0.34 0.07 255);
+  --b360-demo-bg: oklch(0.93 0.025 250);
+  --b360-parcial-fg: oklch(0.36 0.075 68);
+  --b360-parcial-bg: oklch(0.94 0.035 90);
+  --b360-validado-fg: oklch(0.34 0.065 155);
+  --b360-validado-bg: oklch(0.93 0.03 155);
+  --b360-bloqueado-fg: oklch(0.38 0.11 28);
+  --b360-bloqueado-bg: oklch(0.94 0.025 28);
+  --b360-shadow: 0 1px 2px oklch(0.28 0.04 150 / 0.16), 0 12px 28px -16px oklch(0.28 0.04 150 / 0.28);
+  --b360-font-sans: "Schibsted Grotesk", "Segoe UI", sans-serif;
+  --b360-font-mono: "Fragment Mono", ui-monospace, monospace;
+  --b360-text-xs: 0.75rem;
+  --b360-text-sm: 0.875rem;
+  --b360-text-md: 1rem;
+  --b360-text-lg: 1.25rem;
+  --b360-text-xl: 1.75rem;
+  --b360-text-2xl: 2.25rem;
+  --b360-leading-tight: 1.2;
+  --b360-leading-body: 1.5;
+  --b360-weight-regular: 400;
+  --b360-weight-medium: 500;
+  --b360-weight-bold: 700;
+  --b360-tracking-tight: -0.03em;
+  --b360-measure: 68ch;
+  --b360-space-1: 0.25rem;
+  --b360-space-2: 0.5rem;
+  --b360-space-3: 0.75rem;
+  --b360-space-4: 1rem;
+  --b360-space-5: 1.5rem;
+  --b360-space-6: 2rem;
+  --b360-space-7: 3rem;
+  --b360-space-8: 4.5rem;
+  --b360-radius-sm: 0.25rem;
+  --b360-radius-md: 0.5rem;
+  --b360-radius-lg: 0.75rem;
+  --b360-duration-fast: 140ms;
+  --b360-duration-base: 200ms;
+  --b360-duration-slow: 320ms;
+  --b360-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --b360-ease-press: cubic-bezier(0.2, 0, 0, 1);
+}
+/* /light */
+
+/* dark */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --b360-canvas: oklch(0.21 0.024 150);
+  --b360-panel: oklch(0.26 0.026 150);
+  --b360-elevated: oklch(0.31 0.028 150);
+  --b360-ink: oklch(0.95 0.014 125);
+  --b360-ink-secondary: oklch(0.84 0.02 130);
+  --b360-ink-muted: oklch(0.78 0.02 135);
+  --b360-border-strong: oklch(0.68 0.03 140);
+  --b360-header: oklch(0.52 0.05 152);
+  --b360-header-ink: oklch(0.98 0.01 120);
+  --b360-accent: oklch(0.8 0.11 150);
+  --b360-accent-hover: oklch(0.86 0.1 150);
+  --b360-accent-ink: oklch(0.24 0.04 150);
+  --b360-danger: oklch(0.72 0.14 28);
+  --b360-danger-hover: oklch(0.78 0.12 28);
+  --b360-danger-ink: oklch(0.22 0.04 28);
+  --b360-focus: oklch(0.86 0.07 250);
+  --b360-demo-fg: oklch(0.88 0.04 250);
+  --b360-demo-bg: oklch(0.34 0.045 255);
+  --b360-parcial-fg: oklch(0.9 0.05 90);
+  --b360-parcial-bg: oklch(0.36 0.05 75);
+  --b360-validado-fg: oklch(0.9 0.05 155);
+  --b360-validado-bg: oklch(0.34 0.045 155);
+  --b360-bloqueado-fg: oklch(0.9 0.05 30);
+  --b360-bloqueado-bg: oklch(0.36 0.06 28);
+  --b360-shadow: 0 1px 2px oklch(0.1 0.02 150 / 0.45), 0 16px 32px -18px oklch(0.08 0.02 150 / 0.55);
+}
+/* /dark */
+
+/* dark-system */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+  --b360-canvas: oklch(0.21 0.024 150);
+  --b360-panel: oklch(0.26 0.026 150);
+  --b360-elevated: oklch(0.31 0.028 150);
+  --b360-ink: oklch(0.95 0.014 125);
+  --b360-ink-secondary: oklch(0.84 0.02 130);
+  --b360-ink-muted: oklch(0.78 0.02 135);
+  --b360-border-strong: oklch(0.68 0.03 140);
+  --b360-header: oklch(0.52 0.05 152);
+  --b360-header-ink: oklch(0.98 0.01 120);
+  --b360-accent: oklch(0.8 0.11 150);
+  --b360-accent-hover: oklch(0.86 0.1 150);
+  --b360-accent-ink: oklch(0.24 0.04 150);
+  --b360-danger: oklch(0.72 0.14 28);
+  --b360-danger-hover: oklch(0.78 0.12 28);
+  --b360-danger-ink: oklch(0.22 0.04 28);
+  --b360-focus: oklch(0.86 0.07 250);
+  --b360-demo-fg: oklch(0.88 0.04 250);
+  --b360-demo-bg: oklch(0.34 0.045 255);
+  --b360-parcial-fg: oklch(0.9 0.05 90);
+  --b360-parcial-bg: oklch(0.36 0.05 75);
+  --b360-validado-fg: oklch(0.9 0.05 155);
+  --b360-validado-bg: oklch(0.34 0.045 155);
+  --b360-bloqueado-fg: oklch(0.9 0.05 30);
+  --b360-bloqueado-bg: oklch(0.36 0.06 28);
+  --b360-shadow: 0 1px 2px oklch(0.1 0.02 150 / 0.45), 0 16px 32px -18px oklch(0.08 0.02 150 / 0.55);
+  }
+}
+/* /dark-system */
