@@ -4,11 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>B360-AOC</title>
-    <meta name="description" content="Scaffold do Birthub 360 AI Operations Center." />
+    <meta name="description" content="Scaffold do Birthub 360 AI Operations Center. Dados sintéticos." />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2314160f'/%3E%3Ccircle cx='8' cy='8' r='3' fill='%23e6a23c'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23101b12'/%3E%3Ccircle cx='8' cy='8' r='3' fill='%2389d298'/%3E%3C/svg%3E"
     />
+    <script>
+      (function () {
+        var choice = 'system';
+        try {
+          var stored = localStorage.getItem('b360-theme');
+          if (stored === 'light' || stored === 'dark' || stored === 'system') choice = stored;
+        } catch (error) {
+          choice = 'system';
+        }
+        var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var theme = choice === 'system' ? (dark ? 'dark' : 'light') : choice;
+        var root = document.documentElement;
+        root.setAttribute('data-theme', theme);
+        root.setAttribute('data-theme-choice', choice);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
