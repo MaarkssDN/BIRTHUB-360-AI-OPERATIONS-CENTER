@@ -18,7 +18,8 @@
       "id": "MSN-SYNTHETIC-001",
       "title": "Missão sintética de scaffold",
       "executorAgentId": "AG-SYN-EXEC",
-      "auditorAgentId": "AG-SYN-AUD"
+      "auditorAgentId": "AG-SYN-AUD",
+      "tenantId": "tenant-a.example"
     }
   ]
 }

@@ -15,7 +15,7 @@ if (marker !== undefined) {
   try {
     const auth = {
       userId: 'user-synthetic',
-      tenantId: 'tenant-synthetic',
+      tenantId: 'tenant-a.example',
       role: 'operator' as const,
       sessionId: 'session-synthetic',
     };

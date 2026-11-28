@@ -25,27 +25,27 @@ export class JsonMissionRepository implements MissionRepository {
   }
 
   read<T>(auth: AuthContext, work: (unitOfWork: MissionUnitOfWork) => T): T {
-    requireRepositoryAuth(auth, 'read');
+    const verified = requireRepositoryAuth(auth, 'read');
     const run = assertWork(work);
-    return withDatabaseLock(() => run(unitOfWork(loadDatabase())));
+    return withDatabaseLock(() => run(unitOfWork(loadDatabase(), verified.tenantId)));
   }
 
   write<T>(auth: AuthContext, work: (unitOfWork: MissionUnitOfWork) => T): T {
-    requireRepositoryAuth(auth, 'write');
+    const verified = requireRepositoryAuth(auth, 'write');
     const run = assertWork(work);
     return withDatabaseLock(() => {
       const draft = structuredClone(loadDatabase());
-      const result = run(unitOfWork(draft));
+      const result = run(unitOfWork(draft, verified.tenantId));
       saveDatabase(draft);
       return result;
     });
   }
 }
 
-function unitOfWork(state: DatabaseState): MissionUnitOfWork {
+function unitOfWork(state: DatabaseState, tenantId: string): MissionUnitOfWork {
   return {
     getMission(id: string): MissionView | null {
-      const mission = state.missions.find((item) => item.id === id);
+      const mission = state.missions.find((item) => item.id === id && item.tenantId === tenantId);
       if (!mission) {
         return null;
       }
@@ -53,7 +53,7 @@ function unitOfWork(state: DatabaseState): MissionUnitOfWork {
     },
     setMissionTitle(id: string, title: string): void {
       assertMissionTitle(id, title);
-      const index = state.missions.findIndex((item) => item.id === id);
+      const index = state.missions.findIndex((item) => item.id === id && item.tenantId === tenantId);
       const current = state.missions[index];
       if (!current) {
         throw new RepositoryError(`Missão ${id} não existe.`);

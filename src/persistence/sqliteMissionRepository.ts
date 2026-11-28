@@ -16,7 +16,7 @@ import {
 /**
  * Adapter SQLite. `write` é uma transação `BEGIN IMMEDIATE`: se o trabalho
  * lança, faz rollback. A trava de arquivo marca o banco como em uso enquanto
- * a conexão está aberta. O SQL não recebe tenant.
+ * a conexão está aberta. O SQL recebe somente o tenant do contexto autenticado.
  */
 export class SqliteMissionRepository implements MissionRepository {
   private closed = false;
@@ -56,23 +56,24 @@ export class SqliteMissionRepository implements MissionRepository {
 
   read<T>(auth: AuthContext, work: (unitOfWork: MissionUnitOfWork) => T): T {
     this.assertOpen();
-    requireRepositoryAuth(auth, 'read');
-    return this.transaction('DEFERRED', assertWork(work));
+    const verified = requireRepositoryAuth(auth, 'read');
+    return this.transaction('DEFERRED', verified.tenantId, assertWork(work));
   }
 
   write<T>(auth: AuthContext, work: (unitOfWork: MissionUnitOfWork) => T): T {
     this.assertOpen();
-    requireRepositoryAuth(auth, 'write');
-    return this.transaction('IMMEDIATE', assertWork(work));
+    const verified = requireRepositoryAuth(auth, 'write');
+    return this.transaction('IMMEDIATE', verified.tenantId, assertWork(work));
   }
 
   private transaction<T>(
     mode: 'DEFERRED' | 'IMMEDIATE',
+    tenantId: string,
     work: (unitOfWork: MissionUnitOfWork) => T,
   ): T {
     this.db.exec(`BEGIN ${mode}`);
     try {
-      const result = work(this.unitOfWork());
+      const result = work(this.unitOfWork(tenantId));
       this.db.exec('COMMIT');
       return result;
     } catch (error) {
@@ -85,10 +86,10 @@ export class SqliteMissionRepository implements MissionRepository {
     }
   }
 
-  private unitOfWork(): MissionUnitOfWork {
+  private unitOfWork(tenantId: string): MissionUnitOfWork {
     return {
       getMission: (id: string): MissionView | null => {
-        const row = this.db.prepare('SELECT id, title FROM Missions WHERE id = ?').get(id);
+        const row = this.db.prepare('SELECT id, title FROM Missions WHERE id = ? AND tenant_id = ?').get(id, tenantId);
         if (!row) {
           return null;
         }
@@ -98,8 +99,8 @@ export class SqliteMissionRepository implements MissionRepository {
         assertMissionTitle(id, title);
         const updatedAt = new Date().toISOString();
         const result = this.db
-          .prepare('UPDATE Missions SET title = ?, updated_at = ? WHERE id = ?')
-          .run(title, updatedAt, id);
+          .prepare('UPDATE Missions SET title = ?, updated_at = ? WHERE id = ? AND tenant_id = ?')
+          .run(title, updatedAt, id, tenantId);
         if (Number(result.changes) === 0) {
           throw new RepositoryError(`Missão ${id} não existe.`);
         }
