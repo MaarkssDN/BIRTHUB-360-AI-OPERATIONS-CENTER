@@ -25,6 +25,7 @@ export function seedDatabaseFromFixture(
   const raw = fs.readFileSync(fixturePath, 'utf8');
   const state = parseDatabaseState(raw);
   const target = resolveDbFilePath();
+  refuseDatabaseSymlink(target);
   const exists = fs.existsSync(target);
   if (exists && options.overwrite !== true) {
     throw new DatabaseUnavailableError(
@@ -37,4 +38,27 @@ export function seedDatabaseFromFixture(
   }
   saveDatabase(state);
   return path.relative(process.cwd(), target);
+}
+
+function refuseDatabaseSymlink(target: string): void {
+  try {
+    if (fs.lstatSync(target).isSymbolicLink()) {
+      throw new DatabaseUnavailableError(
+        'O caminho do banco é um symlink. Recusado sem seguir nem substituir.',
+      );
+    }
+  } catch (error) {
+    if (error instanceof DatabaseUnavailableError) {
+      throw error;
+    }
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    ) {
+      return;
+    }
+    throw error;
+  }
 }
