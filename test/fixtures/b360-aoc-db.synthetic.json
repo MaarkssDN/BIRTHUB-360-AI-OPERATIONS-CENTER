@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "seed": "synthetic",
+  "governance": {
+    "globalAutomationSuspended": true,
+    "devinBridgeEnabled": false,
+    "devinContractVerified": false
+  },
+  "providers": [
+    {
+      "id": "IA-SYNTHETIC",
+      "name": "Provedor sintético",
+      "environment": "fixture"
+    }
+  ],
+  "missions": [
+    {
+      "id": "MSN-SYNTHETIC-001",
+      "title": "Missão sintética de scaffold",
+      "executorAgentId": "AG-SYN-EXEC",
+      "auditorAgentId": "AG-SYN-AUD"
+    }
+  ]
+}
