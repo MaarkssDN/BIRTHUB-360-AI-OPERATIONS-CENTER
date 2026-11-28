@@ -98,46 +98,59 @@ function createExclusive(lockPath: string, options: FileLockOptions): string {
     acquiredAt: new Date().toISOString(),
   })}\n`;
 
+  // Serialize creation AND stale recovery. A second contender cannot unlink
+  // the newly created lock based on a stale observation of its predecessor.
+  // A crashed gate is intentionally NOT reclaimed automatically: fail closed.
+  const gate = `${lockPath}.gate`;
   for (;;) {
+    let entered = false;
     try {
-      const fd = fs.openSync(
-        lockPath,
-        fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY,
-        0o600,
-      );
-      try {
-        fs.writeSync(fd, payload);
-        fs.fsyncSync(fd);
-      } finally {
-        fs.closeSync(fd);
-      }
-      return nonce;
+      fs.mkdirSync(gate, { mode: 0o700 });
+      entered = true;
     } catch (error) {
-      if (!isErrno(error, 'EEXIST')) {
-        throw error;
-      }
-    }
-
-    const inspection = inspectLock(lockPath, staleMs);
-    if (inspection === 'symlink') {
-      throw new FileLockError(
-        'O lock do banco é um symlink. Recusado sem seguir nem substituir.',
-      );
-    }
-    if (inspection === 'stale') {
+      if (!isErrno(error, 'EEXIST')) throw error;
       try {
-        fs.unlinkSync(lockPath);
-      } catch (error) {
-        if (!isErrno(error, 'ENOENT')) {
-          throw error;
+        const stat = fs.lstatSync(gate);
+        if (!stat.isDirectory() || stat.isSymbolicLink()) {
+          throw new FileLockError('Gate da trava inválido ou symlink.');
         }
+      } catch (inspectionError) {
+        if (!isErrno(inspectionError, 'ENOENT')) throw inspectionError;
       }
-      continue;
+    }
+    if (entered) {
+      try {
+        const inspection = inspectLock(lockPath, staleMs);
+        if (inspection === 'symlink') {
+          throw new FileLockError('O lock do banco é um symlink. Recusado sem seguir nem substituir.');
+        }
+        if (inspection === 'stale') {
+          try {
+            fs.unlinkSync(lockPath);
+          } catch (error) {
+            if (!isErrno(error, 'ENOENT')) throw error;
+          }
+        }
+        if (inspection === 'absent' || inspection === 'stale') {
+          const fd = fs.openSync(
+            lockPath,
+            fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY,
+            0o600,
+          );
+          try {
+            fs.writeFileSync(fd, payload);
+            fs.fsyncSync(fd);
+          } finally {
+            fs.closeSync(fd);
+          }
+          return nonce;
+        }
+      } finally {
+        fs.rmdirSync(gate);
+      }
     }
     if (Date.now() >= deadline) {
-      throw new FileLockError(
-        'Não foi possível obter a trava do banco antes do tempo limite.',
-      );
+      throw new FileLockError('Não foi possível obter a trava do banco antes do tempo limite.');
     }
     Atomics.wait(pauseSlot, 0, 0, 20);
   }
@@ -165,17 +178,17 @@ function releaseExclusive(lockPath: string, nonce: string): void {
   fs.unlinkSync(lockPath);
 }
 
-function inspectLock(lockPath: string, staleMs: number): 'live' | 'stale' | 'symlink' {
+function inspectLock(lockPath: string, staleMs: number): FileLockState {
   let stat: fs.Stats;
   try {
     stat = fs.lstatSync(lockPath);
   } catch (error) {
     if (isErrno(error, 'ENOENT')) {
-      return 'stale';
+      return 'absent';
     }
     throw error;
   }
-  if (stat.isSymbolicLink()) {
+  if (stat.isSymbolicLink() || !stat.isFile()) {
     return 'symlink';
   }
   const record = readLockRecord(lockPath);
@@ -237,10 +250,7 @@ function holderAlive(record: LockRecord): boolean {
   try {
     process.kill(record.pid, 0);
   } catch (error) {
-    if (isErrno(error, 'EPERM')) {
-      return true;
-    }
-    return false;
+    return !isErrno(error, 'ESRCH');
   }
   if (record.starttime === null) {
     return true;
