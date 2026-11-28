@@ -6,11 +6,16 @@ import {
   ReadyResponseSchema,
   type ReadyResponse,
 } from '../shared/contracts.ts';
+import { isApiPath } from './auth/matrix.ts';
+import { mountApi } from './auth/routes.ts';
+import { createAppSecurity, type AppSecurity } from './auth/security.ts';
 import { loadDatabase } from './db.ts';
+import { assertPreflightBirthClosed } from './preflight/flags.ts';
 
 export type CreateAppOptions = {
   vite?: boolean;
   clientDir?: string;
+  security?: AppSecurity;
 };
 
 export type RunningApp = Express & {
@@ -27,10 +32,17 @@ function httpStatus(error: unknown): number {
   return 500;
 }
 
+function safeErrorCode(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return undefined;
+  const code = error.code;
+  if (typeof code !== 'string' || !/^[a-z][a-z0-9_]*$/.test(code)) return undefined;
+  return code;
+}
+
 function attachClient(app: Express, clientDir: string): void {
   app.use(express.static(clientDir));
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if ((req.method !== 'GET' && req.method !== 'HEAD') || req.path.startsWith('/api/')) {
+    if ((req.method !== 'GET' && req.method !== 'HEAD') || isApiPath(req.path)) {
       next();
       return;
     }
@@ -40,6 +52,19 @@ function attachClient(app: Express, clientDir: string): void {
       }
     });
   });
+}
+
+/** A resposta pública não carrega caminho de arquivo, mesmo que a exceção traga um. */
+function readyErrorMessage(error: unknown): string {
+  const fallback = 'Falha ao ler o banco. Carga fail-closed: nada foi semeado.';
+  const message = error instanceof Error ? error.message : 'banco indisponível';
+  if (message.length === 0 || hasFilesystemPath(message)) return fallback;
+  return message;
+}
+
+function hasFilesystemPath(message: string): boolean {
+  if (message.includes('\\') || /[A-Za-z]:\//.test(message)) return true;
+  return /(?:^|[\s"'`(])\/(?:[A-Za-z0-9._-]+\/)+/.test(message);
 }
 
 function sendReady(res: Response): void {
@@ -52,30 +77,31 @@ function sendReady(res: Response): void {
     };
     res.json(ReadyResponseSchema.parse(body));
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'banco indisponível';
-    const body: ReadyResponse = { status: 'not-ready', error: message };
+    const body: ReadyResponse = { status: 'not-ready', error: readyErrorMessage(error) };
     res.status(503).json(ReadyResponseSchema.parse(body));
   }
 }
 
 export async function createApp(options: CreateAppOptions = {}): Promise<RunningApp> {
+  assertPreflightBirthClosed();
+  const security = options.security ?? createAppSecurity();
   const app = express();
   let embedded: ViteDevServer | undefined;
   app.disable('x-powered-by');
   app.use(express.json({ limit: '32kb' }));
-
-  app.get('/api/health', (_req, res) => {
-    res.json(
-      HealthResponseSchema.parse({
-        status: 'ok',
-        service: 'b360-aoc',
-        persistence: 'fail-closed',
-      }),
-    );
-  });
-
-  app.get('/api/ready', (_req, res) => {
-    sendReady(res);
+  mountApi(app, security, {
+    health: (_req, res) => {
+      res.json(
+        HealthResponseSchema.parse({
+          status: 'ok',
+          service: 'b360-aoc',
+          persistence: 'fail-closed',
+        }),
+      );
+    },
+    ready: (_req, res) => {
+      sendReady(res);
+    },
   });
 
   if (options.vite === true) {
@@ -100,7 +126,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Running
       next(error);
       return;
     }
-    res.status(httpStatus(error)).json({ status: 'error' });
+    const code = safeErrorCode(error);
+    res.status(httpStatus(error)).json(code === undefined ? { status: 'error' } : { status: 'error', code });
   });
 
   return Object.assign(app, {
