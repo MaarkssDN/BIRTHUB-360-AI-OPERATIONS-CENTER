@@ -77,7 +77,7 @@ test('applyMigrations materializa 47 tabelas, a unicidade da Outbox e o EventLog
     assert.equal(countOf(db, SCHEMA_MIGRATIONS_TABLE), 3);
 
     for (const table of RELATIONAL_TABLES) {
-      assert.equal(columnNames(db, table).includes('tenant_id'), false, table);
+      assert.equal(columnNames(db, table).includes('tenant_id'), table === 'Missions', table);
     }
 
     const pendingIndex = db
