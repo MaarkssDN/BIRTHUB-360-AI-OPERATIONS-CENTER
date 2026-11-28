@@ -46,4 +46,4 @@ O SQL da `0002` é o da `0003` do transcript (diff completo, 92 linhas de SQL), 
 
 ## `tenant_id`
 
-A coluna não existe. Quando a decisão multi-tenant sair, uma migration posterior acrescenta a coluna, e o filtro usa só o `tenantId` do `AuthContext` — nunca um valor vindo do request. Esse ponto de extensão fica na camada de repositório; esta migration não o antecipa.
+A coluna não existe. O ponto de extensão é `src/persistence/tenantExtension.ts` (`TENANT_ISOLATION = 'pending'`). O repositório exige `AuthContext.tenantId`, não filtra por ele e não aceita tenant vindo de request. Quando a decisão sair, uma migration posterior acrescenta a coluna e o filtro passa a usar só esse campo.

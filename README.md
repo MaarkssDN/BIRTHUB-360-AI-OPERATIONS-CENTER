@@ -29,6 +29,10 @@ npm run migrate:local -- data/b360-aoc.sqlite
 
 `npm run migrate:local` é idempotente, grava o SHA-256 de cada arquivo e pode rodar de novo sem reaplicar. Recusa URL, `d1:`, wrangler e Cloudflare. Não aplica migration remota. A reconstrução da `0001` está em `docs/schema-relacional.md`.
 
+## Repositório
+
+`MissionRepository` recebe `AuthContext` em toda chamada, sem default. O tipo mora em `src/auth/context.ts` (`viewer`, `operator`, `admin`). `requireAuth` não está neste repositório. Nenhum método aceita tenant fora do contexto. O adapter JSON grava só se a unidade de trabalho retorna. O adapter SQLite usa `BEGIN IMMEDIATE` e faz rollback se ela lança. `viewer` não grava. `TENANT_ISOLATION` continua `pending`: não há coluna `tenant_id` e o SQL não filtra por inquilino.
+
 ## Verificar
 
 ```bash
