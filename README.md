@@ -33,6 +33,10 @@ npm run migrate:local -- data/b360-aoc.sqlite
 
 `MissionRepository` recebe `AuthContext` em toda chamada, sem default. O tipo mora em `src/auth/context.ts` (`viewer`, `operator`, `admin`). `requireAuth` não está neste repositório. Nenhum método aceita tenant fora do contexto. O adapter JSON grava só se a unidade de trabalho retorna. O adapter SQLite usa `BEGIN IMMEDIATE` e faz rollback se ela lança. `viewer` não grava. `TENANT_ISOLATION` continua `pending`: não há coluna `tenant_id` e o SQL não filtra por inquilino.
 
+## Backup local
+
+`backupSqlite` e `restoreSqlite` copiam um SQLite local. Os dois recusam URL, `d1:`, wrangler, Cloudflare e symlink, sem seguir nem substituir o link. O restore confere `PRAGMA integrity_check` e a contagem e o hash de cada tabela, inclusive `schema_migrations`. A publicação é temporário no mesmo diretório, `fsync`, `rename` e `fsync` do diretório. Um banco com trava viva só é substituído com `overwriteInUse: true`; a conexão já aberta permanece no inode antigo.
+
 ## Verificar
 
 ```bash
