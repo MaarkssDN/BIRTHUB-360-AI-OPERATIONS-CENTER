@@ -65,7 +65,7 @@ test('applyMigrations materializa 47 tabelas, a unicidade da Outbox e o EventLog
     const first = applyMigrations(db);
     assert.deepEqual(
       first.applied.map((record) => record.filename),
-      ['0001_initial_schema.sql', '0002_imported_conversations_outbox_event_log.sql'],
+      ['0001_initial_schema.sql', '0002_imported_conversations_outbox_event_log.sql', '0003_missions_tenant_scope.sql'],
     );
     assert.deepEqual(first.skipped, []);
     assert.equal(first.domainTables.length, 47);
@@ -74,10 +74,10 @@ test('applyMigrations materializa 47 tabelas, a unicidade da Outbox e o EventLog
       listUserTables(db).sort(),
       [...RELATIONAL_TABLES, SCHEMA_MIGRATIONS_TABLE].sort(),
     );
-    assert.equal(countOf(db, SCHEMA_MIGRATIONS_TABLE), 2);
+    assert.equal(countOf(db, SCHEMA_MIGRATIONS_TABLE), 3);
 
     for (const table of RELATIONAL_TABLES) {
-      assert.equal(columnNames(db, table).includes('tenant_id'), false, table);
+      assert.equal(columnNames(db, table).includes('tenant_id'), table === 'Missions', table);
     }
 
     const pendingIndex = db
@@ -163,7 +163,7 @@ test('a segunda aplicação não muda o schema', () => {
     assert.deepEqual(second.applied, []);
     assert.deepEqual(
       second.skipped.map((record) => record.version),
-      ['0001', '0002'],
+      ['0001', '0002', '0003'],
     );
     assert.equal(countOf(db, SCHEMA_MIGRATIONS_TABLE), before.migrations);
     assert.deepEqual(listUserTables(db), before.tables);
@@ -186,9 +186,9 @@ test('um arquivo SQLite temporário aceita duas execuções do runner', () => {
     const secondDb = openLocalSqlite(filename);
     const second = applyMigrations(secondDb);
     assert.deepEqual(second.applied, []);
-    assert.equal(second.skipped.length, 2);
+    assert.equal(second.skipped.length, 3);
     assert.deepEqual([...second.domainTables].sort(), [...first.domainTables].sort());
-    assert.equal(countOf(secondDb, SCHEMA_MIGRATIONS_TABLE), 2);
+    assert.equal(countOf(secondDb, SCHEMA_MIGRATIONS_TABLE), 3);
     secondDb.close();
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -232,6 +232,7 @@ test('migrate:local lista 47 tabelas e recusa URL', () => {
   assert.deepEqual(summary.applied, [
     '0001_initial_schema.sql',
     '0002_imported_conversations_outbox_event_log.sql',
+    '0003_missions_tenant_scope.sql',
   ]);
 
   const remote = spawnSync(process.execPath, [tsx, script, 'https://example.com/b360.sqlite'], {

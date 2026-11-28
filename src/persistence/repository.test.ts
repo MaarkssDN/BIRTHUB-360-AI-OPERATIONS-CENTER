@@ -25,8 +25,8 @@ const admin = {
 const operator = {
   ...admin,
   role: 'operator' as const,
-  tenantId: 'tenant-b.example',
 };
+const otherTenant = { ...operator, tenantId: 'tenant-b.example' };
 
 const viewer = {
   ...admin,
@@ -52,7 +52,7 @@ test('parseAuthContext recusa contexto ausente e não lê tenant de outro campo'
     tenantFromRequest: 'outro-tenant',
   });
   assert.equal(parsed.tenantId, admin.tenantId);
-  assert.equal(TENANT_ISOLATION, 'pending');
+  assert.equal(TENANT_ISOLATION, 'mission-scoped');
 });
 
 test('o adapter JSON recusa chamada sem contexto e não grava o viewer', async () => {
@@ -99,6 +99,21 @@ test('o adapter JSON desfaz a unidade de trabalho quando ela lança', () => {
   }
 });
 
+test('JSON rejeita leitura e escrita de outro tenant e de registro legado', () => {
+  const repo = JsonMissionRepository.open();
+  try {
+    assert.equal(repo.read(otherTenant, (unit) => unit.getMission(MISSION_ID)), null);
+    assert.throws(() => repo.write(otherTenant, (unit) => unit.setMissionTitle(MISSION_ID, 'intruso')), /não existe/);
+    const file = sandbox.dbPath();
+    const raw = loadDatabase();
+    const legacy = { ...raw, missions: raw.missions.map((mission) => ({ ...mission, tenantId: undefined })) };
+    // Sem atribuição automática do tenant de um registro legado.
+    fs.writeFileSync(file, JSON.stringify(legacy));
+    assert.equal(repo.read(admin, (unit) => unit.getMission(MISSION_ID)), null);
+    assert.throws(() => repo.write(admin, (unit) => unit.setMissionTitle(MISSION_ID, 'não')), /não existe/);
+  } finally { repo.close(); }
+});
+
 test('escritas JSON concorrentes não se perdem', { timeout: 20_000 }, async () => {
   const filePath = sandbox.dbPath();
   const rounds = 4;
@@ -119,7 +134,7 @@ test('escritas JSON concorrentes não se perdem', { timeout: 20_000 }, async () 
   }
 });
 
-test('o adapter SQLite faz rollback, serializa escritores e não filtra tenant', () => {
+test('o adapter SQLite faz rollback, serializa escritores e filtra tenant', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'b360-aoc-repo-'));
   const filename = path.join(dir, 'b360-aoc.sqlite');
   const setup = openLocalSqlite(filename);
@@ -140,12 +155,13 @@ test('o adapter SQLite faz rollback, serializa escritores e não filtra tenant',
     );
 
     const columns = setupColumns(filename);
-    assert.equal(columns.includes('tenant_id'), false);
+    assert.equal(columns.includes('tenant_id'), true);
 
     const seenByA = repoA.read(admin, (unitOfWork) => unitOfWork.getMission(MISSION_ID)?.title);
-    const seenByB = repoB.read(operator, (unitOfWork) => unitOfWork.getMission(MISSION_ID)?.title);
+    const seenByB = repoB.read(otherTenant, (unitOfWork) => unitOfWork.getMission(MISSION_ID)?.title);
     assert.equal(seenByA, 'Missão sintética de scaffold');
-    assert.equal(seenByB, seenByA);
+    assert.equal(seenByB, undefined);
+    assert.throws(() => repoB.write(otherTenant, (unit) => unit.setMissionTitle(MISSION_ID, 'intruso')), /não existe/);
 
     assert.throws(
       () =>
@@ -223,11 +239,11 @@ function seedSyntheticMission(db: ReturnType<typeof openLocalSqlite>): void {
       `INSERT INTO Missions (
         id, code, project_id, wave_id, title, step_number, step_code, status,
         executor_provider_id, executor_agent_id, auditor_agent_id, priority,
-        acceptance_criteria_json, preflight_json, created_at, updated_at
+        acceptance_criteria_json, preflight_json, created_at, updated_at, tenant_id
       ) VALUES (
         'MSN-SYNTHETIC-001', 'MSN-SYN-001', 'PRJ-SYN', 'WAVE-SYN', 'Missão sintética de scaffold',
         1, 'S01', 'ABERTA', 'IA-SYNTHETIC', 'AG-SYN-EXEC', 'AG-SYN-AUD', 'BAIXA',
-        '[]', '[]', '2026-11-27T00:00:00.000Z', '2026-11-27T00:00:00.000Z'
+        '[]', '[]', '2026-11-27T00:00:00.000Z', '2026-11-27T00:00:00.000Z', 'tenant-a.example'
       )`,
     ).run();
     db.exec('COMMIT');

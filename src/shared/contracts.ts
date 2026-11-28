@@ -26,6 +26,8 @@ export const DatabaseStateSchema = z
         .object({
           id: z.string().min(1),
           title: z.string().min(1),
+          // Registros legados sem tenant são preservados, mas inacessíveis via repository.
+          tenantId: z.string().trim().min(1).optional(),
           executorAgentId: z.string().min(1),
           auditorAgentId: z.string().min(1),
         })
