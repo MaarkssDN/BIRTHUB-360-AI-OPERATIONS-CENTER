@@ -41,6 +41,22 @@ export class FileLockError extends Error {
   }
 }
 
+export type FileLockState = 'absent' | 'live' | 'stale' | 'symlink';
+
+/** Lê a trava sem adquiri-la e sem seguir symlink. */
+export function describeFileLock(lockPath: string, staleMs = 5_000): FileLockState {
+  const resolved = path.resolve(lockPath);
+  try {
+    fs.lstatSync(resolved);
+  } catch (error) {
+    if (isErrno(error, 'ENOENT')) {
+      return 'absent';
+    }
+    throw error;
+  }
+  return inspectLock(resolved, staleMs);
+}
+
 export function acquireFileLock(lockPath: string, options: FileLockOptions = {}): () => void {
   const resolved = path.resolve(lockPath);
   const current = heldByPath.get(resolved);
