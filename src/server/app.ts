@@ -84,6 +84,9 @@ function sendReady(res: Response): void {
 
 export async function createApp(options: CreateAppOptions = {}): Promise<RunningApp> {
   assertPreflightBirthClosed();
+  if (process.env.NODE_ENV === 'production' && !options.security) {
+    throw new Error('Produção exige armazenamento de segurança explícito.');
+  }
   const security = options.security ?? createAppSecurity();
   const app = express();
   let embedded: ViteDevServer | undefined;

@@ -1,0 +1,3 @@
+# Candidato — segurança SQLite durável
+
+Produção não inicializa sem banco local existente, provisionado explicitamente, caminho absoluto e permissões restritas. Não cria banco, sessão ou credencial na inicialização. A função provisionSecurityDatabase deve ser executada em ambiente autorizado após backup, por ferramenta administrativa futura. Tokens opacos armazenados como SHA-256; revogação, auditoria de exemplo e suspensão persistem. Dev/test seguem em memória e não autorizam operação real. Não há login público, integração D1, workflow de identidade real, trilha SHA completa ou aprovação de release. Não provisionar dados reais sem gates e política de privacidade.
